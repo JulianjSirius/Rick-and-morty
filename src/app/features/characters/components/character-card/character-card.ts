@@ -1,6 +1,6 @@
 import { TitleCasePipe } from '@angular/common';
 import { Component, input, output, signal } from '@angular/core';
-import { CharacterViewItem } from '../../services/character'; // Verifica que la ruta sea correcta según tu estructura
+import { CharacterViewItem } from '../../services/character';
 
 @Component({
   selector: 'app-character-card',

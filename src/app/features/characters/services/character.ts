@@ -527,53 +527,6 @@ export class CharacterService {
     loadingSignal.set(false);
   }
 
-  loadCharactersByEpisode(episodeId: number | string) {
-    this.isLoading.set(true);
-
-    this.http.get<any>(`${this.EPISODE_URL}/${episodeId}`).subscribe({
-      next: (episodeData) => {
-        const characterUrls: string[] = episodeData.characters;
-
-        const characterIds = characterUrls
-          .map((url) => url.split('/').filter(Boolean).pop())
-          .join(',');
-
-        if (!characterIds) {
-          this.characterList.set([]);
-          this.totalCount.set(0);
-          this.hasMore.set(false);
-          this.isLoading.set(false);
-          return;
-        }
-
-        this.http
-          .get<CharacterListItem | CharacterListItem[]>(`${this.API_URL}/${characterIds}`)
-          .subscribe({
-            next: (charactersResponse) => {
-              const charactersArray = Array.isArray(charactersResponse)
-                ? charactersResponse
-                : [charactersResponse];
-
-              const mappedResults = this.mapToViewItems(charactersArray);
-
-              this.characterList.set(mappedResults);
-              this.totalCount.set(charactersArray.length);
-
-              this.hasMore.set(false);
-              this.isLoading.set(false);
-            },
-            error: (error) => {
-              console.error('Error cargando los detalles de los personajes:', error);
-              this.isLoading.set(false);
-            },
-          });
-      },
-      error: (error) => {
-        console.error('Error cargando el episodio:', error);
-        this.isLoading.set(false);
-      },
-    });
-  }
   updateSearch(term: string) {
     this.searchQuery.set(term);
     const normalized = this.normalizeQuery(term);

@@ -115,12 +115,25 @@
 
       <div class="character-grid">
         @for (poke of characterService.filteredCharacters(); track poke.id) {
-          @defer {
+          @defer (on viewport) {
             <app-character-card
               [character]="poke"
               [isFavorite]="characterService.favorites().includes(poke.id)"
               (toggleFavorite)="characterService.toggleFavorite($event)"
             />
+          } @placeholder {
+            <article class="card-skeleton" aria-hidden="true">
+              <div class="skeleton-header">
+                <span class="skeleton-line skeleton-line-sm"></span>
+                <span class="skeleton-dot"></span>
+              </div>
+              <div class="skeleton-avatar"></div>
+              <div class="skeleton-body">
+                <span class="skeleton-line skeleton-line-lg"></span>
+                <span class="skeleton-line skeleton-line-md"></span>
+                <span class="skeleton-button"></span>
+              </div>
+            </article>
           }
         } @empty {
           <div class="empty-state">

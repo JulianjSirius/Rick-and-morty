@@ -1,1 +1,71 @@
-/* You can add global styles to this file, and also import other style files */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Chakra+Petch:wght@400;500;600;700&display=swap');
+
+:root {
+	color-scheme: dark;
+	--font-body: 'Chakra Petch', sans-serif;
+	--font-display: 'Bebas Neue', sans-serif;
+	--bg: #050806;
+	--bg-strong: #0a1209;
+	--surface: #0f150c;
+	--surface-alt: #182014;
+	--text: #eaffc6;
+	--ink: #eaffc6;
+	--muted: #9bb48c;
+	--accent: #b6ff2d;
+	--accent-deep: #6aff00;
+	--accent-cool: #32f5b2;
+	--line: rgba(182, 255, 45, 0.22);
+	--border: rgba(182, 255, 45, 0.22);
+	--shadow-sm: 0 10px 22px rgba(0, 0, 0, 0.55);
+	--shadow-md: 0 24px 44px rgba(0, 0, 0, 0.65);
+	--radius-xl: 22px;
+	--radius-lg: 18px;
+	--radius-md: 12px;
+	--radius-sm: 10px;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	min-height: 100%;
+}
+
+body {
+	margin: 0;
+	font-family: var(--font-body);
+	color: var(--text);
+	background:
+		radial-gradient(circle at 12% 18%, rgba(182, 255, 45, 0.18), transparent 40%),
+		radial-gradient(circle at 80% 10%, rgba(50, 245, 178, 0.12), transparent 35%),
+		linear-gradient(180deg, #070b06 0%, #050806 100%);
+}
+
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	background-image:
+		repeating-linear-gradient(
+			135deg,
+			rgba(182, 255, 45, 0.05) 0,
+			rgba(182, 255, 45, 0.05) 6px,
+			transparent 6px,
+			transparent 14px
+		);
+	opacity: 0.3;
+}
+
+img {
+	max-width: 100%;
+	display: block;
+}
+
+button,
+input,
+select {
+	font: inherit;
+}

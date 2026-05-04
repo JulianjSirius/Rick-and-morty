@@ -21,7 +21,14 @@
   </div>
 
   <div class="card-image-wrapper">
-    <img [src]="character().imageUrl" [alt]="character().name" loading="lazy" />
+    <img
+      [src]="character().imageUrl"
+      [alt]="character().name"
+      loading="lazy"
+      decoding="async"
+      width="140"
+      height="140"
+    />
   </div>
 
   <div class="card-body">
@@ -56,9 +63,7 @@
           <div class="episodes-section">
             <p class="episodes-title">Apariciones ({{ character().episodes?.length || 0 }}):</p>
             <div class="episodes-grid">
-              @for (ep of character().episodes; track ep) {
-                
-              }
+              @for (ep of character().episodes; track ep) {}
             </div>
           </div>
         </div>
