@@ -1,0 +1,175 @@
+<div class="dashboard-container">
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="pokeball-icon"></div>
+        <h1>Pokédex</h1>
+      </div>
+
+      <div class="controls">
+        <div class="search-wrapper">
+          <svg
+            class="search-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            class="search-input"
+            placeholder="Buscar por nombre o Nº..."
+            (input)="onSearch($event)"
+            [value]="characterService.searchQuery()"
+          />
+        </div>
+
+        <button
+          class="btn-fav-filter"
+          (click)="characterService.toggleFavoriteview()"
+          [class.active]="characterService.showFavoritesOnly()"
+        >
+          <svg class="star-icon" viewBox="0 0 24 24">
+            <path
+              d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+            />
+          </svg>
+          {{ characterService.showFavoritesOnly() ? 'Ver todos' : 'Favoritos' }}
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    @if (characterService.isLoading()) {
+      <div class="loading-container">
+        <div class="pokeball-spinner"></div>
+        <p class="loading-text">Cargando Personajes...</p>
+      </div>
+    } @else {
+      <div class="results-bar">
+        <span class="results-count">
+          <strong>{{ characterService.filteredCharacters().length }}</strong> Personajes
+        </span>
+      </div>
+
+      <div class="filters-bar">
+        <div class="filters-left">
+          <div class="filter-group">
+            <label class="filter-label" for="typeSelect">Tipo</label>
+            <select id="typeSelect" class="filter-select" (change)="onTypeChange($event)">
+              <option value="all" [selected]="characterService.selectedEpisode() === 'all'">
+                Todos
+              </option>
+              @for (type of characterService.types(); track type.name) {
+                <option
+                  [value]="type.name"
+                  [selected]="characterService.selectedEpisode() === type.name"
+                >
+                  {{ type.name }}
+                </option>
+              }
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label" for="locationSelect">Ubicación</label>
+            <select id="locationSelect" class="filter-select" (change)="onLocationChange($event)">
+              <option value="all" [selected]="characterService.selectedLocation() === 'all'">
+                Todos
+              </option>
+              @for (location of characterService.locations(); track location.name) {
+                <option
+                  [value]="location.name"
+                  [selected]="characterService.selectedLocation() === location.name"
+                >
+                  {{ location.name }}
+                </option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <div class="view-toggle" role="group" aria-label="Modo de vista">
+          <button
+            type="button"
+            class="toggle-btn"
+            [class.active]="characterService.viewMode() === 'scroll'"
+            (click)="setViewMode('scroll')"
+          >
+            Scroll
+          </button>
+          <button
+            type="button"
+            class="toggle-btn"
+            [class.active]="characterService.viewMode() === 'paged'"
+            (click)="setViewMode('paged')"
+          >
+            Paginado
+          </button>
+        </div>
+      </div>
+
+      <div class="character-grid">
+        @for (poke of characterService.filteredCharacters(); track poke.id) {
+          @defer {
+            <app-character-card
+              [character]="characterService"
+              [isFavorite]="characterService.favorites().includes(character.id)"
+              (toggleFavorite)="characterService.toggleFavorite($event)"
+            />
+          }
+        } @empty {
+          <div class="empty-state">
+            <div class="empty-icon">😔</div>
+            <p class="empty-title">No se encontraron Personajes</p>
+            <p class="empty-sub">Intenta con otro nombre o número de Pokédex</p>
+          </div>
+        }
+      </div>
+
+      @if (characterService.viewMode() === 'scroll' && characterService.isLoadingMore()) {
+        <div class="load-more">
+          <span class="load-more-spinner"></span>
+          Cargando más Personajes...
+        </div>
+      }
+
+      @if (
+        characterService.viewMode() === 'scroll' &&
+        !characterService.hasMore() &&
+        characterService.filteredCharacters().length > 0
+      ) {
+        <div class="end-message">No hay más resultados</div>
+      }
+
+      @if (characterService.viewMode() === 'paged' && characterService.totalCount() > 0) {
+        <div class="pagination-bar">
+          <button
+            type="button"
+            class="page-btn"
+            (click)="goToPreviousPage()"
+            [disabled]="characterService.currentPage() <= 1"
+          >
+            Anterior
+          </button>
+          <span class="page-info">
+            Pagina {{ characterService.currentPage() }} de {{ characterService.totalPages() }}
+          </span>
+          <button
+            type="button"
+            class="page-btn"
+            (click)="goToNextPage()"
+            [disabled]="characterService.currentPage() >= characterService.totalPages()"
+          >
+            Siguiente
+          </button>
+        </div>
+      }
+    }
+    <div #scrollSentinel class="scroll-sentinel"></div>
+  </main>
+</div>

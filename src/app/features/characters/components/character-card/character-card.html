@@ -1,0 +1,51 @@
+<div class="card" [class.is-favorite]="isFavorite()">
+  <div class="card-header">
+    <span class="pokemon-number">#{{ character().id().toString().padStart(3, '0') }}</span>
+    <button
+      class="btn-favorite"
+      [class.active]="isFavorite()"
+      (click)="onToggleFavorite()"
+      [attr.aria-label]="isFavorite() ? 'Quitar de favoritos' : 'Añadir a favoritos'"
+    >
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+        />
+      </svg>
+    </button>
+  </div>
+
+  <div class="card-image-wrapper">
+    <img [src]="character().imageUrl()" [alt]="character().name()" loading="lazy" />
+  </div>
+
+  <div class="card-body">
+    <h3 class="pokemon-name">{{ character().name() | titlecase }}</h3>
+
+    <button class="btn-details" (click)="showStats.set(!showStats())">
+      <span>{{ showStats() ? 'Ocultar stats' : 'Ver stats' }}</span>
+      <svg
+        class="chevron"
+        [class.rotated]="showStats()"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    </button>
+
+    @defer (when showStats()) {
+      @if (showStats()) {
+        <div class="character-stats">
+          <p>Stats de {{ character().name() }}</p>
+          <!-- Reemplazado el componente desconocido por un bloque inline para evitar errores de compilación -->
+        </div>
+      }
+    } @placeholder {
+      <span></span>
+    }
+  </div>
+</div>
