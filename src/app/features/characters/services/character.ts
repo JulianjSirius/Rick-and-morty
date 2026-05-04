@@ -149,6 +149,7 @@ export class CharacterService {
     if (this.selectedEpisode() === type) return;
     this.selectedEpisode.set(type);
     this.resetPagination();
+    this.offset = 0;
     this.reloadFromFilter();
     this.searchResults.set([]);
     this.refreshSearchResults();
@@ -158,6 +159,7 @@ export class CharacterService {
     if (this.selectedLocation() === location) return;
     this.selectedLocation.set(location);
     this.resetPagination();
+    this.offset = 0;
     this.reloadFromFilter();
     this.searchResults.set([]);
     this.refreshSearchResults();
