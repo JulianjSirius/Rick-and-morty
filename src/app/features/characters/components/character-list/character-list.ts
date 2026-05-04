@@ -8,8 +8,8 @@ import {
   OnInit,
   ViewChild,
 } from '@angular/core';
-import { CharacterService } from '../../services/favorites';
-import { CharacterCard } from "../character-card/character-card";
+import { CharacterService } from '../../services/character';
+import { CharacterCard } from '../character-card/character-card';
 
 @Component({
   selector: 'app-character-list',
@@ -20,7 +20,7 @@ import { CharacterCard } from "../character-card/character-card";
 export class CharacterList implements OnInit, AfterViewInit, OnDestroy {
   characterService = inject(CharacterService);
 
-  @ViewChild('scrollSentinel', { static: true })
+  @ViewChild('scrollSentinel', { static: false }) // Cambiado a false para asegurar que esté en el DOM
   scrollSentinel!: ElementRef<HTMLDivElement>;
 
   private observer?: IntersectionObserver;
@@ -30,24 +30,37 @@ export class CharacterList implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
+    // Usamos el Observer porque es más preciso que calcular pixeles a mano
     this.observer = new IntersectionObserver(
       (entries) => {
+        const sentinel = entries[0];
+        // Si el centinela es visible Y el modo es scroll Y NO estamos cargando ya
         if (
+          sentinel.isIntersecting && 
           this.characterService.viewMode() === 'scroll' &&
-          entries.some((entry) => entry.isIntersecting)
+          !this.characterService.isLoading() // Importante: no pedir si ya está cargando
         ) {
           this.characterService.loadNextPage();
         }
       },
-      { rootMargin: '300px' },
+      { 
+        root: null, // usa el viewport del navegador
+        rootMargin: '400px', // Carga 400px antes de llegar al final para que sea fluido
+        threshold: 0.1 
+      }
     );
 
-    this.observer.observe(this.scrollSentinel.nativeElement);
+    if (this.scrollSentinel) {
+      this.observer.observe(this.scrollSentinel.nativeElement);
+    }
   }
 
   ngOnDestroy(): void {
     this.observer?.disconnect();
   }
+
+  // ELIMINA EL @HostListener('window:scroll')
+  // Ya no lo necesitas, el IntersectionObserver hace el trabajo mejor.
 
   onSearch(event: Event) {
     const inputElement = event.target as HTMLInputElement;

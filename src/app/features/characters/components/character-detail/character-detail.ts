@@ -1,5 +1,5 @@
 import { Component, input, resource } from '@angular/core';
-import { Character } from '../../../../core/models/character';
+import { Character } from '../../../../core/models/character-interface';
 import { NgOptimizedImage } from '@angular/common';
 import { RouterLink } from '@angular/router';
 
@@ -18,7 +18,13 @@ import { RouterLink } from '@angular/router';
       <div class="detail-layout">
         <div class="main-info">
           <!-- Eliminamos el $any ya que el tipado ahora es correcto -->
-          <img [ngSrc]="character.image" width="300" height="300" alt="{{ character.name }}" priority>
+          <img
+            [ngSrc]="character.image"
+            width="300"
+            height="300"
+            alt="{{ character.name }}"
+            priority
+          />
           <h2>{{ character.name }}</h2>
           <ul>
             <li><strong>Estado:</strong> {{ character.status }}</li>
@@ -45,27 +51,57 @@ import { RouterLink } from '@angular/router';
       </div>
     }
   `,
-  styles: [`
-    .detail-layout { display: flex; flex-direction: column; gap: 2rem; margin-top: 1rem; align-items: center;}
-    .main-info { text-align: center; }
-    .main-info img { border-radius: 8px; }
-    ul { list-style: none; padding: 0; }
-    .episodes-section { margin-top: 50vh; margin-bottom: 50px; }
-    .episode-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-    .placeholder { padding: 2rem; background: #eee; text-align: center; }
-  `]
+  styles: [
+    `
+      .detail-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        margin-top: 1rem;
+        align-items: center;
+      }
+      .main-info {
+        text-align: center;
+      }
+      .main-info img {
+        border-radius: 8px;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+      }
+      .episodes-section {
+        margin-top: 50vh;
+        margin-bottom: 50px;
+      }
+      .episode-list {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+      .placeholder {
+        padding: 2rem;
+        background: #eee;
+        text-align: center;
+      }
+    `,
+  ],
 })
 export class CharacterDetailComponent {
   // Recibe el ID directamente desde el Router (con withComponentInputBinding habilitado en app.config.ts)
   id = input.required<string>();
 
-  // Consumo de datos con Resource API (Angular 20)
+  // Consumo de datos con Resource API
   characterResource = resource({
-    request: () => ({ id: this.id() }),
-    loader: async ({ request }) => {
-      const response = await fetch(`https://rickandmortyapi.com/api/character/${request.id}`);
+    // 1. Cambiamos 'request' por 'params'
+    params: () => ({ id: this.id() }),
+
+    // 2. Extraemos 'params' en lugar de 'request'
+    loader: async ({ params }) => {
+      // 3. Usamos params.id en tu fetch
+      const response = await fetch(`https://rickandmortyapi.com/api/character/${params.id}`);
       if (!response.ok) throw new Error('Personaje no encontrado');
-      return await response.json() as Character;
-    }
+      return (await response.json()) as Character;
+    },
   });
 }

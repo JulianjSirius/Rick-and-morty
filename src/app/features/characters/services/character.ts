@@ -1,21 +1,9 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { CharacterListItem, CharacterListResponse } from '../../../core/models/character';
-
-interface CharacterTypeResponse {
-  character: { character: CharacterListItem }[];
-}
+import { CharacterListItem, CharacterListResponse } from '../../../core/models/character-interface';
 
 interface CharacterTypeListResponse {
   results: CharacterListItem[];
-}
-
-interface CharacterlocationListResponse {
-  results: CharacterListItem[];
-}
-
-interface CharacterlocationResponse {
-  character_species: CharacterListItem[];
 }
 
 interface CharacterDetailsResponse {
@@ -24,16 +12,17 @@ interface CharacterDetailsResponse {
   types: { type: { name: string } }[];
 }
 
-interface CharacterSpeciesResponse {
-  location: { name: string } | null;
-}
-
 type ViewMode = 'scroll' | 'paged';
 
 export interface CharacterViewItem extends CharacterListItem {
   id: number;
   imageUrl: string;
   types?: string[];
+  status?: string;
+  species?: string;
+  gender?: string;
+  originName?: string;
+  episodes?: string[];
 }
 
 @Injectable({
@@ -41,17 +30,15 @@ export interface CharacterViewItem extends CharacterListItem {
 })
 export class CharacterService {
   private http = inject(HttpClient);
-  private readonly API_URL = 'https://pokeapi.co/api/v2/pokemon';
+  private readonly API_URL = 'https://rickandmortyapi.com/api/character';
   private readonly LOCATION_URL = 'https://rickandmortyapi.com/api/location';
   private readonly EPISODE_URL = 'https://rickandmortyapi.com/api/episode';
-  private readonly SPECIES_URL = 'https://rickandmortyapi.com/api/character';
   private readonly PAGE_SIZE = 20;
 
   private offset = 0;
   private typeOffset = 0;
   private locationOffset = 0;
   private combinedOffset = 0;
-  private typeCache = new Map<string, CharacterListItem[]>();
   private locationCache = new Map<string, CharacterListItem[]>();
   private episodeCache = new Map<string, CharacterListItem[]>();
   private searchTimeout?: ReturnType<typeof setTimeout>;
@@ -115,12 +102,31 @@ export class CharacterService {
     this.loadEpisodes();
     this.resetPagination();
     this.reloadFromFilter();
+    this.loadLocations();
+  }
+  loadLocations() {
+    if (this.locations().length > 0) return;
+    this.http.get<any>(this.LOCATION_URL).subscribe({
+      next: (response) => {
+        // Guardamos los resultados en la señal de locations
+        this.locations.set(response.results);
+      },
+      error: (error) => console.error('Error loading locations:', error),
+    });
   }
 
   setViewMode(mode: ViewMode) {
     if (this.viewMode() === mode) return;
     this.viewMode.set(mode);
+
+    this.offset = 0;
+    this.typeOffset = 0;
+    this.locationOffset = 0;
+    this.combinedOffset = 0;
     this.resetPagination();
+    this.characterList.set([]);
+    this.currentPage.set(1);
+    this.hasMore.set(true);
     this.reloadFromFilter();
     this.refreshSearchResults();
   }
@@ -240,30 +246,31 @@ export class CharacterService {
   }
 
   loadPage(page: number) {
-    if (this.viewMode() !== 'paged') return;
-    if (this.isLoading() || this.isLoadingMore()) return;
-
-    const targetPage = Math.max(1, page);
-    this.currentPage.set(targetPage);
+    // 1. Definimos targetPage para que TypeScript sepa qué es
+    const targetPage = page;
 
     const episodeActive = this.selectedEpisode() !== 'all';
     const locationActive = this.selectedLocation() !== 'all';
 
-    if (episodeActive && locationActive) {
-      if (!this.combinedCharacters.length) {
-        this.buildCombinedList();
-      }
-      if (!this.combinedCharacters.length) return;
-      this.applyCombinedPage(targetPage);
-      return;
-    }
+    if (!episodeActive && !locationActive) {
+      this.isLoading.set(true);
 
-    if (locationActive) {
-      if (!this.locationCharacters.length) {
-        this.loadLocationList(this.selectedLocation());
-        return;
-      }
-      this.applyLocationPage(targetPage);
+      // 2. Usamos targetPage en la URL de Rick y Morty
+      this.http.get<any>(`${this.API_URL}?page=${targetPage}`).subscribe({
+        next: (response) => {
+          const mappedResults = this.mapToViewItems(response.results);
+          this.characterList.set(mappedResults);
+
+          this.totalCount.set(response.info.count);
+          this.currentPage.set(targetPage);
+          this.hasMore.set(Boolean(response.info.next));
+          this.isLoading.set(false);
+        },
+        error: (error) => {
+          console.error('Error al cargar la página:', error);
+          this.isLoading.set(false);
+        },
+      });
       return;
     }
 
@@ -296,90 +303,79 @@ export class CharacterService {
 
     this.applyEpisodePage(targetPage);
   }
-
-  private loadEpisodeList(episode: string) {
-    const cached = this.episodeCache.get(episode);
+  private fetchCharactersByContext(
+    url: string,
+    cache: Map<string, any[]>,
+    contextKey: string,
+    dataKey: 'characters' | 'residents',
+    targetArray: 'episodeCharacters' | 'locationCharacters',
+  ) {
+    const cached = cache.get(contextKey);
     if (cached) {
-      this.episodeCharacters = cached;
+      this[targetArray] = cached;
       this.totalCount.set(cached.length);
       this.applyFiltersAfterLoad();
       return;
     }
 
     this.isLoading.set(true);
-    // Usamos 'any' para evitar conflictos con la interfaz vieja de Pokemon
-    this.http.get<any>(`${this.EPISODE_URL}/${episode}`).subscribe({
+    this.http.get<any>(`${url}/${contextKey}`).subscribe({
       next: (response) => {
-        // 1. En Rick and Morty, los personajes de un episodio están en 'characters'
-        const charactersUrls = response.characters || [];
+        const urls = response[dataKey] || [];
+        const characterIds = urls
+          .map((url: string) => url.split('/').filter(Boolean).pop())
+          .join(',');
 
-        // 2. Mapeamos las URLs a objetos CharacterListItem para mantener tu lógica
-        const mappedCharacters = charactersUrls.map((url: string) => ({
-          id: parseInt(url.split('/').pop() || '0'),
-          name: '',
-          url: url,
-        }));
+        if (!characterIds) {
+          this[targetArray] = [];
+          this.isLoading.set(false);
+          this.totalCount.set(0);
+          this.hasMore.set(false);
+          this.applyFiltersAfterLoad();
+          return;
+        }
 
-        this.episodeCache.set(episode, mappedCharacters);
-        this.episodeCharacters = mappedCharacters;
+        this.http.get<any>(`${this.API_URL}/${characterIds}`).subscribe({
+          next: (charsResponse) => {
+            const charsArray = Array.isArray(charsResponse) ? charsResponse : [charsResponse];
+            cache.set(contextKey, charsArray);
+            this[targetArray] = charsArray;
 
-        this.isLoading.set(false);
-        this.totalCount.set(mappedCharacters.length);
-        this.hasMore.set(mappedCharacters.length > 0);
-        this.applyFiltersAfterLoad();
+            this.isLoading.set(false);
+            this.totalCount.set(charsArray.length);
+            this.hasMore.set(charsArray.length > 0);
+            this.applyFiltersAfterLoad();
+          },
+          error: () => this.isLoading.set(false),
+        });
       },
-      error: (error) => {
-        console.error('Error loading episode list:', error);
+      error: () => {
         this.isLoading.set(false);
         this.hasMore.set(false);
       },
     });
+  }
+  private loadEpisodeList(episode: string) {
+    this.fetchCharactersByContext(
+      this.EPISODE_URL,
+      this.episodeCache,
+      episode,
+      'characters',
+      'episodeCharacters',
+    );
   }
 
   private loadLocationList(location: string) {
-    const cached = this.locationCache.get(location);
-    if (cached) {
-      this.locationCharacters = cached;
-      this.totalCount.set(cached.length);
-      this.applyFiltersAfterLoad();
-      return;
-    }
-
-    this.isLoading.set(true);
-    // Cambiamos el tipo de la respuesta a 'any' temporalmente o a una interfaz que tenga 'residents'
-    this.http.get<any>(`${this.LOCATION_URL}/${location}`).subscribe({
-      next: (response) => {
-        // En Rick and Morty, los personajes de una ubicación están en 'residents'
-        // Como 'residents' es un array de URLs, primero asignamos el array vacío o los datos
-        const residents = response.residents || [];
-
-        // IMPORTANTE: Para que tu lógica de paginación funcione,
-        // necesitamos objetos de tipo CharacterListItem, no solo URLs.
-        // Por ahora, para quitar el error en rojo, mapeamos las URLs a objetos básicos:
-        const mappedResidents = residents.map((url: string) => ({
-          id: parseInt(url.split('/').pop() || '0'),
-          name: '', // El nombre se cargará luego en el mapToViewItems o búsqueda
-          url: url,
-        }));
-
-        this.locationCharacters = mappedResidents;
-        this.locationCache.set(location, mappedResidents);
-
-        this.isLoading.set(false);
-        this.totalCount.set(mappedResidents.length);
-        this.hasMore.set(mappedResidents.length > 0);
-        this.applyFiltersAfterLoad();
-      },
-      error: (error) => {
-        console.error('Error loading location list:', error);
-        this.isLoading.set(false);
-        this.hasMore.set(false);
-      },
-    });
+    this.fetchCharactersByContext(
+      this.LOCATION_URL,
+      this.locationCache,
+      location,
+      'residents',
+      'locationCharacters',
+    );
   }
 
   private resetPagination() {
-    this.offset = 0;
     this.typeOffset = 0;
     this.locationOffset = 0;
     this.combinedOffset = 0;
@@ -442,13 +438,21 @@ export class CharacterService {
     this.hasMore.set(safePage < totalPages);
   }
 
-  private mapToViewItems(list: CharacterListItem[]): CharacterViewItem[] {
+  private mapToViewItems(list: any[]): CharacterViewItem[] {
     return list.map((character) => {
       const id = parseInt(character.url.split('/').filter(Boolean).pop() || '0', 10);
       return {
         ...character,
         id,
-        imageUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`,
+        imageUrl: `https://rickandmortyapi.com/api/character/avatar/${id}.jpeg`,
+
+        status: character.status || 'Desconocido',
+        species: character.species || 'Desconocido',
+        gender: character.gender || 'Desconocido',
+        originName: character.origin?.name || 'Desconocido',
+        episodes: character.episode
+          ? character.episode.map((url: string) => url.split('/').filter(Boolean).pop())
+          : [],
       };
     });
   }
@@ -526,19 +530,14 @@ export class CharacterService {
   loadCharactersByEpisode(episodeId: number | string) {
     this.isLoading.set(true);
 
-    // PASO 1: Obtener la información del episodio
     this.http.get<any>(`${this.EPISODE_URL}/${episodeId}`).subscribe({
       next: (episodeData) => {
-        // PASO 2: Extraer los IDs de las URLs de los personajes
-        // episodeData.characters es un array como: [".../character/1", ".../character/2"]
         const characterUrls: string[] = episodeData.characters;
 
-        // Extraemos solo el número final de cada URL y los unimos con comas
         const characterIds = characterUrls
           .map((url) => url.split('/').filter(Boolean).pop())
           .join(',');
 
-        // Si el episodio no tiene personajes (raro, pero seguro), detenemos aquí
         if (!characterIds) {
           this.characterList.set([]);
           this.totalCount.set(0);
@@ -547,27 +546,19 @@ export class CharacterService {
           return;
         }
 
-        // PASO 3: Hacer la petición masiva (Bulk) para traer toda la data junta
         this.http
           .get<CharacterListItem | CharacterListItem[]>(`${this.API_URL}/${characterIds}`)
           .subscribe({
             next: (charactersResponse) => {
-              // ⚠️ DETALLE TÉCNICO IMPORTANTE:
-              // Si le pasas un solo ID, la API devuelve un Objeto.
-              // Si le pasas varios IDs, devuelve un Array. Lo normalizamos:
               const charactersArray = Array.isArray(charactersResponse)
                 ? charactersResponse
                 : [charactersResponse];
 
-              // Reutilizamos tu función mapeadora para la vista
               const mappedResults = this.mapToViewItems(charactersArray);
 
-              // Actualizamos las Signals
               this.characterList.set(mappedResults);
               this.totalCount.set(charactersArray.length);
 
-              // Cuando buscas por episodio, la API te entrega TODOS los personajes de golpe.
-              // Por lo tanto, no hay paginación nativa para esto, hasMore siempre será false.
               this.hasMore.set(false);
               this.isLoading.set(false);
             },
@@ -597,7 +588,7 @@ export class CharacterService {
     }
 
     this.searchTimeout = setTimeout(() => {
-      this.requestSearchPokemon(normalized);
+      this.requestSearch(normalized);
     }, 350);
   }
 
@@ -616,14 +607,14 @@ export class CharacterService {
   private refreshSearchResults() {
     const normalized = this.normalizeQuery(this.searchQuery());
     if (!normalized) return;
-    this.requestSearchPokemon(normalized);
+    this.requestSearch(normalized);
   }
 
   private normalizeQuery(term: string): string {
     return term.toLowerCase().trim();
   }
 
-  private requestSearchPokemon(query: string) {
+  private requestSearch(query: string) {
     if (!this.shouldFetchQuery(query)) return;
 
     this.http.get<CharacterDetailsResponse>(`${this.API_URL}/${query}`).subscribe({
@@ -637,7 +628,7 @@ export class CharacterService {
           id: response.id,
           name: response.name,
           url: `${this.API_URL}/${response.id}/`,
-          imageUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${response.id}.png`,
+          imageUrl: `https://rickandmortyapi.com/api/character/avatar/${response.id}.jpeg`,
           types,
         };
 
