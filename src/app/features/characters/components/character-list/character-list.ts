@@ -43,7 +43,7 @@ export class CharacterList implements OnInit, AfterViewInit, OnDestroy {
       },
       {
         root: null, // usa el viewport del navegador
-        rootMargin: '900px 0px', // Pre-carga mas arriba del scroll
+        rootMargin: '300px 0px', // Pre-carga mas arriba del scroll
         threshold: 0,
       },
     );
