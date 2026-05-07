@@ -6,10 +6,19 @@ interface CharacterTypeListResponse {
   results: CharacterListItem[];
 }
 
-interface CharacterDetailsResponse {
+interface CharacterApiItem {
   id: number;
   name: string;
-  types: { type: { name: string } }[];
+  status?: string;
+  species?: string;
+  gender?: string;
+  origin?: { name?: string };
+  episode?: string[];
+  url: string;
+}
+
+interface CharacterSearchResponse {
+  results: CharacterApiItem[];
 }
 
 type ViewMode = 'scroll' | 'paged';
@@ -535,6 +544,10 @@ export class CharacterService {
 
     if (!normalized) {
       this.searchResults.set([]);
+      this.searchNotFound.clear();
+      this.resetPagination();
+      this.offset = 0;
+      this.reloadFromFilter();
       return;
     }
 
@@ -572,31 +585,41 @@ export class CharacterService {
   private requestSearch(query: string) {
     if (!this.shouldFetchQuery(query)) return;
 
-    this.http.get<CharacterDetailsResponse>(`${this.API_URL}/${query}`).subscribe({
-      next: (response) => {
-        const types = response.types.map((entry) => entry.type.name);
-        if (this.selectedEpisode() !== 'all' && !types.includes(this.selectedEpisode())) {
-          return;
-        }
+    const isNumeric = /^[0-9]+$/.test(query);
+    if (isNumeric) {
+      this.http.get<CharacterApiItem>(`${this.API_URL}/${query}`).subscribe({
+        next: (response) => {
+          const mapped = this.mapToViewItems([response]);
+          this.searchResults.set(mapped);
+        },
+        error: (error) => {
+          if (error?.status === 404) {
+            this.searchNotFound.add(query);
+            this.searchResults.set([]);
+            return;
+          }
+          console.error('Error searching character:', error);
+        },
+      });
+      return;
+    }
 
-        const result: CharacterViewItem = {
-          id: response.id,
-          name: response.name,
-          url: `${this.API_URL}/${response.id}/`,
-          imageUrl: `https://rickandmortyapi.com/api/character/avatar/${response.id}.jpeg`,
-          types,
-        };
-
-        this.addSearchResult(result);
-      },
-      error: (error) => {
-        if (error?.status === 404) {
-          this.searchNotFound.add(query);
-          return;
-        }
-        console.error('Error searching pokemon:', error);
-      },
-    });
+    this.http
+      .get<CharacterSearchResponse>(`${this.API_URL}?name=${encodeURIComponent(query)}`)
+      .subscribe({
+        next: (response) => {
+          const mapped = this.mapToViewItems(response.results || []);
+          this.searchResults.set(mapped);
+        },
+        error: (error) => {
+          if (error?.status === 404) {
+            this.searchNotFound.add(query);
+            this.searchResults.set([]);
+            return;
+          }
+          console.error('Error searching characters:', error);
+        },
+      });
   }
 
   private shouldFetchQuery(query: string): boolean {
@@ -607,21 +630,15 @@ export class CharacterService {
     if (!isNumeric && query.length < this.MIN_SEARCH_LENGTH) return false;
 
     const inList = this.characterList().some(
-      (character) => character.name === query || character.id.toString() === query,
+      (character) => character.name.toLowerCase() === query || character.id.toString() === query,
     );
     if (inList) return false;
 
     const inSearchResults = this.searchResults().some(
-      (character) => character.name === query || character.id.toString() === query,
+      (character) => character.name.toLowerCase() === query || character.id.toString() === query,
     );
 
     return !inSearchResults;
-  }
-
-  private addSearchResult(result: CharacterViewItem) {
-    this.searchResults.update((list) =>
-      list.some((character) => character.id === result.id) ? list : [...list, result],
-    );
   }
 
   private mergeSearchResults(
